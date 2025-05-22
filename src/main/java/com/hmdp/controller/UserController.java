@@ -39,8 +39,7 @@ public class UserController {
      */
     @PostMapping("code")
     public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
-        userService.sendCode(phone, session);
-        return Result.ok("data");
+        return userService.sendCode(phone, session);
     }
 
     /**
