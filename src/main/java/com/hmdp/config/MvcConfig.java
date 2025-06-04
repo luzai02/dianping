@@ -16,6 +16,9 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new RefreshInterceptor(stringRedisTemplate))
+                .addPathPatterns("/**")
+                .order(0);
         // 登录拦截器
         registry.addInterceptor(new LoginInterceptor())
                 .excludePathPatterns(
@@ -27,8 +30,5 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/upload/**",
                         "/voucher/**"
                 ).order(1);
-        registry.addInterceptor(new RefreshInterceptor(stringRedisTemplate))
-                .excludePathPatterns("/**")
-                .order(0);
     }
 }

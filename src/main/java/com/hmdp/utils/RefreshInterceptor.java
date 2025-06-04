@@ -14,9 +14,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class RefreshInterceptor implements HandlerInterceptor {
-    @Resource  // 依赖注入
-    private StringRedisTemplate  stringRedisTemplate;
-
+    // @Resource  // 依赖注入
+    private final StringRedisTemplate  stringRedisTemplate;
     // 构造函数
     public RefreshInterceptor(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
@@ -35,6 +34,7 @@ public class RefreshInterceptor implements HandlerInterceptor {
         Map<Object, Object> user = stringRedisTemplate.opsForHash().entries(key);
 
         if(user.isEmpty()){
+            // 如果为空，直接放行
             return true;
         }
 
@@ -43,7 +43,7 @@ public class RefreshInterceptor implements HandlerInterceptor {
         UserDTO userDTO = BeanUtil.fillBeanWithMap(user, new UserDTO(), false);
         UserHolder.saveUser(userDTO);
         // 刷新token有效期
-        stringRedisTemplate.expire(key, RedisConstant.LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(key, RedisConstant.LOGIN_USER_TTL, TimeUnit.HOURS);
         return true;
     }
     // 释放资源

@@ -77,7 +77,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
 
         // 每次登录都会生成随机token
-        String token = UUID.randomUUID().toString(true);  // 使用hutool生成随机字符串token
 
         // 查询用户是否存在，不存在就创建新用户
         User user = query().eq("phone", loginForm.getPhone()).one();
@@ -91,25 +90,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
 
         // 从redis中查找用户信息，这里应该要用上一个登录状态的token
-        Map<Object, Object> userRedisInfo = stringRedisTemplate.opsForHash().entries(RedisConstant.LOGIN_USER_KEY + loginForm.getPhone());
-        if(userRedisInfo.isEmpty()){
-            // todo ： 这里需要优化——》如果redis中已经有用户信息，那么不需要再新建到redis中了。
-            // 由于登录状态的token是随机生成的，所以无法查找redis的用户
-            // todo: 能不能有jwt令牌？跟随机token比有什么好处？
+        //  Map<Object, Object> userRedisInfo = stringRedisTemplate.opsForHash().entries(RedisConstant.LOGIN_USER_KEY + loginForm.getPhone());
+        // if(userRedisInfo.isEmpty()){
 
-            // 将用户信息保存到redis中，保存的是DTO（只用来查找用户的基本信息)
-            UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-            // redis中的用户数据用Hash来保存，一减省空间，二方便crud     将user对象转为map
-            // 而StringRedisTemplate中要求存储的数据都要是String类型，这里要做类型的转换
-            Map<String,Object> userMap = BeanUtil.beanToMap(userDTO,  new HashMap<>(),
-                    CopyOptions.create()
-                            .setIgnoreNullValue(true)   // 忽略null值
-                            // 将字段值转换为String类型
-                            .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString())
-            );
-            // redis中user的key是随机的login:token
-            stringRedisTemplate.opsForHash().putAll(RedisConstant.LOGIN_USER_KEY + token, userMap);
-        }
+        // todo ： 这里需要优化——》如果redis中已经有用户信息，那么不需要再新建到redis中了。
+        // 由于登录状态的token是随机生成的，所以无法查找redis的用户
+        // todo: 能不能有jwt令牌？跟随机token比有什么好处？
+
+        // 将用户信息保存到redis中，保存的是DTO（只用来查找用户的基本信息)
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        // redis中的用户数据用Hash来保存，一减省空间，二方便crud     将user对象转为map
+        // 而StringRedisTemplate中要求存储的数据都要是String类型，这里要做类型的转换
+        String token = UUID.randomUUID().toString(true);  // 使用hutool生成随机字符串token
+        Map<String,Object> userMap = BeanUtil.beanToMap(userDTO,  new HashMap<>(),
+                CopyOptions.create()
+                        .setIgnoreNullValue(true)   // 忽略null值
+                        // 将字段值转换为String类型
+                        .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString())
+        );
+        // redis中user的key是随机的login:token
+        stringRedisTemplate.opsForHash().putAll(RedisConstant.LOGIN_USER_KEY + token, userMap);
+
+        // }
 
         // 设置token过期时间
         stringRedisTemplate.expire(RedisConstant.LOGIN_USER_KEY + token, RedisConstant.LOGIN_USER_TTL, TimeUnit.HOURS);
