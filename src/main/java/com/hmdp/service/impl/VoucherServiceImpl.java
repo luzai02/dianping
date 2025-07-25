@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.List;
 
+import static com.hmdp.constant.RedisConstant.SECKILL_STOCK_KEY;
 import static com.hmdp.constant.RedisConstant.SECKKILL_VOUCHER;
 
 /**
@@ -54,6 +55,6 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucherService.save(seckillVoucher);
         // 把秒杀信息保存到Redis中
         // todo 为什么只存储优惠券id  和  库存
-        stringRedisTemplate.opsForValue().set(SECKKILL_VOUCHER + voucher.getId(), voucher.getStock().toString());
+        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
     }
 }

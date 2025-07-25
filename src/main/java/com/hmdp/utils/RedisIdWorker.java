@@ -20,16 +20,21 @@ public class RedisIdWorker {
     // 设置全局唯一的自增id
     // 64位，第一位用来作符号位，中间31位用来做时间戳（增加复杂性），最后32位用来做序列号
     /*
-    原子性：Redis单线程模型保证INCR操作的线程安全
+    原子性：Redis单线程模型保证INCR操作的线程安全   ，incr 操作通常指 原子性自增操作，常见于键值存储系统（如 Redis）或并发编程场景
     分布式唯一性：时间戳+业务前缀+日期维度共同保障
     空间效率：使用数值存储比字符串更节省内存
      */
-    public  long nextId(String key) {
+    public long nextId(String key) {
 
         // 获取当前时间
         LocalDateTime now = LocalDateTime.now();
         // 将其转换为UTC时区对应的UNIX时间戳（1970年以来的秒数）(UTC是零时区（基准时区）)
         // todo 要保证时区一致，所有否则获取的时间戳会因为时区不同而产生偏差
+            /*这段代码的功能是获取当前时间的Unix时间戳（秒级），使用UTC时区作为基准。具体解释如下：
+            now.toEpochSecond(ZoneOffset.UTC) 将LocalDateTime对象转换为自1970-01-01 00:00:00 UTC（零时区）起计算的秒数
+            使用ZoneOffset.UTC确保时区统一，避免因服务器时区差异导致时间戳偏差
+            计算结果nowSeconds是当前时间与UTC基准时刻的时间差值（单位：秒）
+            例如：若当前UTC时间为2025-01-01 00:00:00，则返回1735689600（即2025年元旦的Unix时间戳）*/
         long nowSeconds = now.toEpochSecond(ZoneOffset.UTC);
         long timestamp = nowSeconds - BEGIN_TIMESTAMP;
 

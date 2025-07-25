@@ -21,7 +21,7 @@ public class CacheClient {
 
     private final StringRedisTemplate stringRedisTemplate;
 
-    // 构造注入，autowired可以省略
+    // 构造注入，autowired可以省略(只有一个构造函数时)
     public  CacheClient(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
@@ -41,13 +41,13 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData), expireTime, unit);
     }
 
-    // 根据指定的key查询缓存，并且反序列化为指定类型，利用缓存空值的方式解决缓存穿透问题
+    // 根据指定的key查询缓存，并且反序列化为指定类型，利用  缓存空值  的方式解决缓存穿透问题
     public <T, ID> T queryWithNullPassThrough(ID id, String keyPrefix, Long expireTime, TimeUnit unit,
                                             Class<T> type,
                                             Function<ID, T> dbfallback){
         String key = keyPrefix+id;
         // 从缓存中查找
-        String Json = stringRedisTemplate.opsForValue().get(key); // redis中存储的数据是json字符串
+        String Json = stringRedisTemplate.opsForValue().get(key); //   redis中存储的数据是json字符串
 
         // 如果存在
         if(StrUtil.isNotBlank(Json)){   // 只有是有效（非空非空白）字符 时才为true
@@ -55,7 +55,7 @@ public class CacheClient {
             return JSONUtil.toBean(Json, type); // json字符串转对象
         }
         // 如果不存在
-        if(Json != null){   // 也就是为 “” 时，如果为null，可能是第一次查询而redis还没有缓存数据
+        if(Json != null){   // 也就是为 “” 时（不是null），如果为null，可能是第一次查询而redis还没有缓存数据
             return null;
         }
 
@@ -84,7 +84,7 @@ public class CacheClient {
     }
 
 
-    // 根据指定的key查询缓存，并且反序列化为指定类型，利用逻辑过期的方式解决缓存击穿问题
+    // 根据指定的key查询缓存，并且反序列化为指定类型，利用  逻辑过期  的方式解决缓存击穿问题
     public <T, ID> T queryWithLoginExpired(String keyPrefix, ID id, Long expireTime, TimeUnit unit,
                                            Function<ID, T> dbfallback,
                                            Class<T> type){
@@ -134,7 +134,7 @@ public class CacheClient {
                     try {
                         // 去数据库查询数据，上面未未查询数据库，这里要添加逻辑
                         // todo ：这里是新建对象还是对对象重新赋值？
-                        T newT = dbfallback.apply(id);
+                        T newT = dbfallback.apply(id);   // todo：这是什么操作？？？
                         this.setWithLoginExpired(key, newT, expireTime, unit);
                     } catch (Exception e) {
                         throw new RuntimeException(e);

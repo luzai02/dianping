@@ -135,6 +135,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return JSONUtil.toBean(shopJson, Shop.class); // json字符串转对象
         }
         // 如果不存在
+        // todo：意思是需要预热？？？
         if(shopJson != null){   // 也就是为 “” 时，如果为null，可能是第一次查询而redis还没有缓存数据
             return null;
         }
@@ -160,13 +161,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
             // 查询数据库
             shop = getById(id);
-            // 如果不存在，向redis中写入空值，解决缓存穿透问题
+            // 如果不存在，向redis中写入空值，解决缓存穿透问题  // 这里包含了缓存穿透的解决
             if(shop == null){
                 stringRedisTemplate.opsForValue().set(key, "", RedisConstant.CACHE_NULL_TTL, TimeUnit.MINUTES);
                 return null;
             }
 
-            // 这里包含了缓存穿透的解决
+
             // 写入缓存，将shop对象转为json字符串
             // 设置过期时间
             stringRedisTemplate.opsForValue().set(
@@ -219,7 +220,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             // doubleCheck  todo : 这里的双重检验很有讲究
             shopJson = stringRedisTemplate.opsForValue().get(key);
             if(StrUtil.isNotBlank(shopJson)){
-                // todo: 这里需要获取新的对象
+                // todo: 这里需要获取新的对象 （而不是使用之前获取的，之前的不可能出现更新）
                 redisData = JSONUtil.toBean(shopJson, RedisData.class);  // 先将Json转为RedisData对象
                 LocalDateTime latestExpireTime = redisData.getExpireTime();
                 if(latestExpireTime.isAfter(LocalDateTime.now())){
