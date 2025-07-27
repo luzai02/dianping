@@ -65,7 +65,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                 id,
                 RedisConstant.CACHE_SHOP_TTL,
                 TimeUnit.MINUTES,
-                this::getById,  // 可以写成 this::getById
+                this::getById,  // 可以写成 this::getById  todo:为什么这样写，还能怎么写
                 Shop.class
                 );
 

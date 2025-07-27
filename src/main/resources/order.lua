@@ -1,32 +1,32 @@
--- 1.参数列表
--- 1.1.优惠券id
+--- 判断库存是否充足 && 判断用户是否已下单
+--- @param ARGV[1] voucherId 优惠券ID
+--- @param ARGV[2] userId 用户ID
+--- @return number 0:成功 1:库存不足 2:用户已下单
+
 local voucherId = ARGV[1]
--- 1.2.用户id
 local userId = ARGV[2]
--- 1.3.订单id
 local orderId = ARGV[3]
 
--- 2.数据key
--- 2.1.库存key
 local stockKey = 'seckill:stock:' .. voucherId
--- 2.2.订单key
 local orderKey = 'seckill:order:' .. voucherId
 
--- 3.脚本业务
--- 3.1.判断库存是否充足 get stockKey
-if(tonumber(redis.call('get', stockKey)) <= 0) then
-    -- 3.2.库存不足，返回1
-    return 1
+-- 获取库存
+local stock = redis.call('GET', stockKey)
+if not stock or tonumber(stock) <= 0 then
+    return 1 -- 库存不足
 end
--- 3.2.判断用户是否下单 SISMEMBER orderKey userId
-if(redis.call('sismember', orderKey, userId) == 1) then
-    -- 3.3.存在，说明是重复下单，返回2
-    return 2
+
+-- 检查用户是否已经下单
+if redis.call('SISMEMBER', orderKey, userId) == 1 then
+    return 2 -- 用户已下单
 end
--- 3.4.扣库存 incrby stockKey -1
-redis.call('incrby', stockKey, -1)
--- 3.5.下单（保存用户）sadd orderKey userId
-redis.call('sadd', orderKey, userId)
--- 3.6.发送消息到队列中， XADD stream.orders * k1 v1 k2 v2 ...
-redis.call('xadd', 'stream.orders', '*', 'userId', userId, 'voucherId', voucherId, 'id', orderId)
-return 0
+
+-- 扣减库存
+redis.call('DECR', stockKey)
+-- 添加用户到下单集合
+redis.call('SADD', orderKey, userId)
+
+-- 发送消息
+redis.call('XADD', 'stream.orders', '*', 'userId', userId, 'voucherId', voucherId, 'id', orderId)
+
+return 0 -- 下单成功

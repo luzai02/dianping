@@ -60,4 +60,6 @@ public class UploadController {
         // 生成文件名
         return StrUtil.format("/blogs/{}/{}/{}.{}", d1, d2, name, suffix);
     }
+
+
 }
