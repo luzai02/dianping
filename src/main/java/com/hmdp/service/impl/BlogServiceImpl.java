@@ -3,10 +3,15 @@ package com.hmdp.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
@@ -14,14 +19,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.apache.tomcat.util.buf.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +45,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private FollowServiceImpl followService;
+    @Autowired
+    private IBlogService iBlogService;
+
     @Override
     public Result saveBlog(Blog blog) {
         // 获取登录用户
@@ -52,7 +61,19 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             // 返回id
             return Result.ok("保存失败");
         }
-        // todo:将博客推送给所有粉丝
+        // 将博客推送给所有粉丝
+        // 查询所有粉丝，然后使用Feed的推模式，一个个推送
+        List<Follow> follows = followService.list(new LambdaQueryWrapper<Follow>()
+                .eq(Follow::getFollowUserId, user.getId())
+        );
+
+        for(Follow follow: follows){
+            // 获取粉丝
+            Long followId = follow.getUserId();
+            String key = "feed:" + followId;
+            // 分数使用时间戳
+            stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
+        }
 
         return Result.ok(blog.getId());
     }
@@ -177,5 +198,53 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         Page<Blog> page = query().eq("user_id", current).page(new Page<>(1, SystemConstants.MAX_PAGE_SIZE));
         List<Blog> records = page.getRecords();  // 提取分页结果
         return Result.ok(records);
+    }
+
+    @Override
+    public Result queryBlogOfFollow(Long max, Integer offset) {
+        // 查询是否有博客（收件箱
+        Long userId = UserHolder.getUser().getId();
+        String key = "feed:"+userId;
+        // ZSet元组
+        Set<ZSetOperations.TypedTuple<String>> typedTuples
+                = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, max, offset, 2);
+        if(typedTuples == null || typedTuples.isEmpty()){
+            return Result.ok();
+        }
+        // 有数据，获取集合里元组的value(关注的博主的id)，然后滚动分页
+        List<Long> ids = new ArrayList<>(typedTuples.size());
+        long minTime = 0; // 记录当前最小值
+        int os = 1;  // 偏移量
+
+        for(ZSetOperations.TypedTuple<String> tuple: typedTuples){
+            ids.add(Long.valueOf(tuple.getValue()));
+            long time = tuple.getScore().longValue();
+            if(time == minTime){
+                // 当前时间等于最小时间，偏移量+1， 防止相同分数重复查询
+                os++;
+            }else{
+                minTime = time;
+                os = 1;
+            }
+        }
+
+        // 根据id查询blog，类似点赞显示
+        // 使用in查询，默认是按照id升序排序的，所以这里要自己定义排序顺序
+        String idStr = StrUtil.join(",", ids);
+        List<Blog> blogs = this.list(new LambdaUpdateWrapper<Blog>()
+                .in(Blog::getId, ids).last("order by field(id," + idStr + ")"));
+        for(Blog blog : blogs){
+            queryUserByBlog(blog);
+            isLiked(blog);
+        }
+
+        // 封装返回
+        ScrollResult scrollResult = new ScrollResult();
+        scrollResult.setList(blogs);
+        scrollResult.setOffset(os);
+        scrollResult.setMinTime(minTime);
+
+        return Result.ok(scrollResult);
+
     }
 }
