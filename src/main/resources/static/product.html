@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手写MyBatis：渐进式源码实践（全彩）- 拼团优惠</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+            background-color: #fff;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 轮播图部分 */
+        .carousel-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            overflow: hidden;
+            background-color: #fff;
+        }
+
+        .carousel-wrapper {
+            display: flex;
+            transition: transform 0.3s ease-in-out;
+            height: 100%;
+        }
+
+        .carousel-slide {
+            min-width: 100%;
+            height: 100%;
+        }
+
+        .carousel-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .carousel-indicators {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .indicator.active {
+            background-color: #ff5777;
+        }
+
+        /* 产品信息部分 */
+        .product-info {
+            padding: 16px;
+            background-color: #fff;
+        }
+
+        .product-title {
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .promotion-banner {
+            background: linear-gradient(90deg, #ff5777, #ff8a9b);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        /* 价格信息 */
+        .price-section {
+            margin-bottom: 20px;
+        }
+
+        .current-price {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ff5777;
+            margin-right: 12px;
+        }
+
+        .original-price {
+            font-size: 16px;
+            color: #999;
+            text-decoration: line-through;
+        }
+
+        .price-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* 参团信息 */
+        .group-info {
+            background-color: #fff;
+            padding: 16px;
+            border-top: 8px solid #f5f5f5;
+        }
+
+        .group-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .group-title-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .participants-count {
+            background-color: #ff5777;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .participants-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .participant {
+            background-color: #f8f8f8;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            color: #666;
+            border: 1px solid #e8e8e8;
+        }
+
+        .participant.highlight {
+            background-color: #fff2f4;
+            color: #ff5777;
+            border-color: #ff5777;
+        }
+
+        /* 倒计时 */
+        .countdown-section {
+            background: linear-gradient(135deg, #ff5777, #ff8a9b);
+            color: #fff;
+            padding: 16px;
+            margin: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .countdown-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .countdown-timer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .time-unit {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 8px;
+            min-width: 50px;
+        }
+
+        .time-separator {
+            font-size: 20px;
+        }
+
+        /* 购买按钮 */
+        .purchase-section {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 420px;
+            background-color: #fff;
+            padding: 12px 16px;
+            box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .purchase-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-group {
+            background: linear-gradient(135deg, #ff5777, #ff8a9b);
+            color: #fff;
+        }
+
+        .btn-buy {
+            background: linear-gradient(135deg, #ff3a5e, #ff5777);
+            color: #fff;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 375px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            .product-title {
+                font-size: 16px;
+            }
+            
+            .current-price {
+                font-size: 24px;
+            }
+            
+            .countdown-timer {
+                font-size: 16px;
+            }
+            
+            .time-unit {
+                padding: 6px 10px;
+                min-width: 45px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .carousel-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 轮播图 -->
+        <div class="carousel-container">
+            <div class="carousel-wrapper" id="carouselWrapper">
+                <div class="carousel-slide">
+                    <img src="https://bugstack.cn/images/article/product/book/mybatis-03.png?raw=true" alt="手写MyBatis教程封面">
+                </div>
+                <div class="carousel-slide">
+                    <img src="https://bugstack.cn/images/article/product/book/mybatis-03.png?raw=true" alt="手写MyBatis教程内页">
+                </div>
+                <div class="carousel-slide">
+                    <img src="https://bugstack.cn/images/article/product/book/mybatis-03.png?raw=true" alt="手写MyBatis教程详情">
+                </div>
+            </div>
+            <div class="carousel-indicators">
+                <div class="indicator active" onclick="goToSlide(0)"></div>
+                <div class="indicator" onclick="goToSlide(1)"></div>
+                <div class="indicator" onclick="goToSlide(2)"></div>
+            </div>
+        </div>
+
+        <!-- 产品信息 -->
+        <div class="product-info fade-in">
+            <h1 class="product-title">手写MyBatis：渐进式源码实践（全彩）</h1>
+            <span class="promotion-banner pulse">🔥 限时拼团特惠</span>
+            
+            <div class="price-section">
+                <span class="current-price">¥89.9</span>
+                <span class="original-price">¥199.9</span>
+                <div class="price-label">拼团价，限时优惠</div>
+            </div>
+        </div>
+
+        <!-- 参团信息 -->
+        <div class="group-info fade-in">
+            <div class="group-title">
+                <span class="group-title-text">已有</span>
+                <span class="participants-count" id="participantsCount">1268</span>
+                <span class="group-title-text">人参团</span>
+            </div>
+            
+            <div class="participants-list" id="participantsList">
+                <div class="participant highlight">小明</div>
+                <div class="participant">李华</div>
+                <div class="participant">张三</div>
+                <div class="participant">王五</div>
+                <div class="participant">赵六</div>
+                <div class="participant">孙七</div>
+                <div class="participant">周八</div>
+                <div class="participant">吴九</div>
+            </div>
+        </div>
+
+        <!-- 倒计时 -->
+        <div class="countdown-section fade-in">
+            <div class="countdown-title">⏰ 拼团倒计时</div>
+            <div class="countdown-timer" id="countdownTimer">
+                <div class="time-unit" id="hours">02</div>
+                <div class="time-separator">:</div>
+                <div class="time-unit" id="minutes">35</div>
+                <div class="time-separator">:</div>
+                <div class="time-unit" id="seconds">42</div>
+            </div>
+        </div>
+
+        <!-- 购买按钮 -->
+        <div class="purchase-section">
+            <div class="purchase-buttons">
+                <button class="btn btn-group" onclick="joinGroup()">
+                    立即参团 ¥89.9
+                </button>
+                <button class="btn btn-buy" onclick="buyNow()">
+                    单独购买 ¥199.9
+                </button>
+            </div>
+        </div>
+
+        <!-- 底部留白 -->
+        <div style="height: 80px;"></div>
+    </div>
+
+    <script>
+        // 轮播图功能
+        let currentSlide = 0;
+        const totalSlides = 3;
+        const carouselWrapper = document.getElementById('carouselWrapper');
+        const indicators = document.querySelectorAll('.indicator');
+
+        function goToSlide(slideIndex) {
+            currentSlide = slideIndex;
+            const translateX = -slideIndex * 100;
+            carouselWrapper.style.transform = `translateX(${translateX}%)`;
+            
+            // 更新指示器
+            indicators.forEach((indicator, index) => {
+                indicator.classList.toggle('active', index === slideIndex);
+            });
+        }
+
+        // 自动轮播
+        function autoSlide() {
+            currentSlide = (currentSlide + 1) % totalSlides;
+            goToSlide(currentSlide);
+        }
+
+        // 每3秒自动切换
+        setInterval(autoSlide, 3000);
+
+        // 倒计时功能
+        let timeLeft = {
+            hours: 2,
+            minutes: 35,
+            seconds: 42
+        };
+
+        function updateCountdown() {
+            // 更新秒数
+            timeLeft.seconds--;
+            
+            if (timeLeft.seconds < 0) {
+                timeLeft.seconds = 59;
+                timeLeft.minutes--;
+                
+                if (timeLeft.minutes < 0) {
+                    timeLeft.minutes = 59;
+                    timeLeft.hours--;
+                    
+                    if (timeLeft.hours < 0) {
+                        // 倒计时结束
+                        timeLeft = { hours: 0, minutes: 0, seconds: 0 };
+                        document.querySelector('.countdown-title').textContent = '🎉 活动已结束';
+                        return;
+                    }
+                }
+            }
+            
+            // 更新显示
+            document.getElementById('hours').textContent = String(timeLeft.hours).padStart(2, '0');
+            document.getElementById('minutes').textContent = String(timeLeft.minutes).padStart(2, '0');
+            document.getElementById('seconds').textContent = String(timeLeft.seconds).padStart(2, '0');
+        }
+
+        // 每秒更新倒计时
+        setInterval(updateCountdown, 1000);
+
+        // 动态参与者名单
+        const participantNames = [
+            '小明', '李华', '张三', '王五', '赵六', '孙七', '周八', '吴九',
+            '陈十', '刘一', '马二', '黄三', '白四', '青五', '紫六', '红七',
+            '蓝八', '绿九', '橙十', '粉一', '灰二', '金三', '银四', '铜五'
+        ];
+
+        let participantCount = 1268;
+
+        function addNewParticipant() {
+            const participantsList = document.getElementById('participantsList');
+            const randomName = participantNames[Math.floor(Math.random() * participantNames.length)];
+            
+            // 移除所有highlight类
+            document.querySelectorAll('.participant').forEach(p => p.classList.remove('highlight'));
+            
+            // 创建新参与者元素
+            const newParticipant = document.createElement('div');
+            newParticipant.className = 'participant highlight';
+            newParticipant.textContent = randomName;
+            
+            // 插入到第一个位置
+            participantsList.insertBefore(newParticipant, participantsList.firstChild);
+            
+            // 限制显示的参与者数量
+            const participants = participantsList.querySelectorAll('.participant');
+            if (participants.length > 8) {
+                participantsList.removeChild(participants[participants.length - 1]);
+            }
+            
+            // 更新参与者数量
+            participantCount += Math.floor(Math.random() * 3) + 1;
+            document.getElementById('participantsCount').textContent = participantCount;
+        }
+
+        // 每5-15秒随机添加新参与者
+        function scheduleNextParticipant() {
+            const delay = Math.random() * 10000 + 5000; // 5-15秒
+            setTimeout(() => {
+                addNewParticipant();
+                scheduleNextParticipant();
+            }, delay);
+        }
+
+        scheduleNextParticipant();
+
+        // 购买按钮功能
+        function joinGroup() {
+            // 模拟参团操作
+            const btn = event.target;
+            const originalText = btn.textContent;
+            
+            btn.style.background = '#28a745';
+            btn.textContent = '参团成功！';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.style.background = 'linear-gradient(135deg, #ff5777, #ff8a9b)';
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
+
+        function buyNow() {
+            // 模拟单独购买操作
+            const btn = event.target;
+            const originalText = btn.textContent;
+            
+            btn.style.background = '#007bff';
+            btn.textContent = '处理中...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.style.background = 'linear-gradient(135deg, #ff3a5e, #ff5777)';
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
+
+        // 页面加载动画
+        document.addEventListener('DOMContentLoaded', function() {
+            const elements = document.querySelectorAll('.fade-in');
+            elements.forEach((element, index) => {
+                element.style.animationDelay = `${index * 0.2}s`;
+            });
+        });
+
+        // 触摸滑动支持（移动端）
+        let startX = 0;
+        let startY = 0;
+        let isScrolling = false;
+
+        carouselWrapper.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].pageX;
+            startY = e.touches[0].pageY;
+            isScrolling = false;
+        });
+
+        carouselWrapper.addEventListener('touchmove', function(e) {
+            if (!isScrolling) {
+                const diffX = Math.abs(e.touches[0].pageX - startX);
+                const diffY = Math.abs(e.touches[0].pageY - startY);
+                isScrolling = diffY > diffX;
+            }
+        });
+
+        carouselWrapper.addEventListener('touchend', function(e) {
+            if (isScrolling) return;
+            
+            const endX = e.changedTouches[0].pageX;
+            const diffX = startX - endX;
+            
+            if (Math.abs(diffX) > 50) { // 滑动距离阈值
+                if (diffX > 0) {
+                    // 向左滑动，下一张
+                    const nextSlide = (currentSlide + 1) % totalSlides;
+                    goToSlide(nextSlide);
+                } else {
+                    // 向右滑动，上一张
+                    const prevSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+                    goToSlide(prevSlide);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
