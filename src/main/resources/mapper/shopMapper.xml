@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hmdp.mapper.ShopMapper"> <!-- 这里要替换成实际的 ShopMapper 接口的全限定名 -->
+
+    <select id="selectAllShopIds" resultType="java.lang.Long">
+        SELECT id
+        FROM tb_shop
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+</mapper>

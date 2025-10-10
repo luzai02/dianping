@@ -5,17 +5,20 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import com.hmdp.constant.RedisConstant;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
+import com.hmdp.entity.PageResult;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,9 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import static com.hmdp.utils.RedisConstants.LOGIN_CODE_KEY;
-import static com.hmdp.utils.RedisConstants.LOGIN_CODE_TTL;
 
 /**
  * <p>
@@ -45,6 +45,9 @@ import static com.hmdp.utils.RedisConstants.LOGIN_CODE_TTL;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
     @Resource  // 用法类似@atutowired，是jdk的标准注解
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private UserMapper userMapper;
+
     @Override
     public Result sendCode(String phone, HttpSession session) {
         // 校验手机号
@@ -53,7 +56,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 生成验证码
         String code = RandomUtil.randomNumbers(6);
-        // 保存到 session   todo: 这里的验证码到底保存在哪？
+        // 保存到 session
         stringRedisTemplate.opsForValue().set(RedisConstant.LOGIN_CODE_KEY + phone, code, RedisConstant.LOGIN_CODE_TTL, TimeUnit.MINUTES);
         log.info("发送验证码成功:{}",code);
         // 发送验证码
@@ -73,7 +76,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return "ERROR_PHONE";
         }
         // 然后从redis中获取验证码那对比前端的验证码
-        // redis中验证码的key是phone    // todo: 为什么
+        // redis中验证码的key是phone  保证key的唯一性
+        // todo： 这里怎么判断手机号和验证码是一一对应的呢？  --》 使用hash，登录成功后删除验证码
         String cacheCode = stringRedisTemplate.opsForValue().get(RedisConstant.LOGIN_CODE_KEY + loginForm.getPhone());
         String code = loginForm.getCode();
         // 如果验证码不一致或者redis中的验证码过期，返回错误信息
@@ -82,7 +86,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
 
         // 每次登录都会生成随机token
-
         // 查询用户是否存在，不存在就创建新用户
         User user = query().eq("phone", loginForm.getPhone()).one();
         if(user == null){
@@ -99,9 +102,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // if(userRedisInfo.isEmpty()){
 
         // todo ： 这里需要优化——》如果redis中已经有用户信息，那么不需要再新建到redis中了。
+        //  ---》  这里的逻辑应该是：退出登陆后，redis中的用户信息应该被删除，所以不会出现反复存储的用户信息
         // 由于登录状态的token是随机生成的，所以无法查找redis的用户
-        // todo: 能不能有jwt令牌？跟随机token比有什么好处？
-
+        // todo: 能不能用jwt令牌？跟随机token比有什么好处？
         // 将用户信息保存到redis中，保存的是DTO（只用来查找用户的基本信息)
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         // redis中的用户数据用Hash来保存，一减省空间，二方便crud     将user对象转为map
@@ -115,9 +118,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         );
         // redis中user的key是随机的login:token
         stringRedisTemplate.opsForHash().putAll(RedisConstant.LOGIN_USER_KEY + token, userMap);
-
         // }
-
         // 设置token过期时间
         stringRedisTemplate.expire(RedisConstant.LOGIN_USER_KEY + token, RedisConstant.LOGIN_USER_TTL, TimeUnit.HOURS);
 
@@ -172,5 +173,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             num >>= 1;
         }
         return Result.ok(count);
+    }
+
+    @Override
+    public PageResult listByPage(int pageNum, int pageSize) {
+        PageHelper.startPage(pageNum, pageSize);   // 第几页，每页多少条
+        PageInfo<User> pageInfo = new PageInfo<>(userMapper.selectAll()); // PageInfo 包含：总记录数、当前页数据、总页数等信息
+        long total = pageInfo.getTotal();  // 获取总记录数
+        List<User> list = pageInfo.getList();  // 获取当前页数据
+        return new PageResult(total, list);
     }
 }

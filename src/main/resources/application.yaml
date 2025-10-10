@@ -11,6 +11,12 @@ spring:
     password: '042022'
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8088
+
+
 
   redis:
     host: 127.0.0.1
@@ -30,3 +36,15 @@ mybatis-plus:
 logging:
   level:
     com.hmdp: debug
+rocketmq:
+  name-server: 172.25.202.49:9876
+  producer:
+      group: seckill-producer-group
+      send-message-timeout: 3000
+
+canal:
+  destination: test # canal的集群名字，要与安装canal时设置的名称一致
+  server: 127.0.0.1:11111 # canal服务地址
+  username: canal # canal用户名
+  password: canal # canal密码
+

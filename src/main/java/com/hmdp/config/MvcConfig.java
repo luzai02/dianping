@@ -13,14 +13,18 @@ import javax.annotation.Resource;
 public class MvcConfig implements WebMvcConfigurer {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private RefreshInterceptor refreshInterceptor;
+    @Resource
+    private LoginInterceptor loginInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new RefreshInterceptor(stringRedisTemplate))
+        registry.addInterceptor(refreshInterceptor)
                 .addPathPatterns("/**")
                 .order(0);
         // 登录拦截器
-        registry.addInterceptor(new LoginInterceptor())
+        registry.addInterceptor(loginInterceptor)
                 .excludePathPatterns(
                         "/user/code",
                         "/user/login",

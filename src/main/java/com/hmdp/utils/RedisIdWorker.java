@@ -24,6 +24,8 @@ public class RedisIdWorker {
     分布式唯一性：时间戳+业务前缀+日期维度共同保障
     空间效率：使用数值存储比字符串更节省内存
      */
+
+    // long的长度就是64位
     public long nextId(String key) {
 
         // 获取当前时间
@@ -45,7 +47,7 @@ public class RedisIdWorker {
         // 默认每次  自增1
         long count = stringRedisTemplate.opsForValue().increment("icr:" + key + ":" + data);   // 序列号
 
-        return timestamp << 32 | count;  // 用 位移  和  或  来拼接
+        return timestamp << 32 | count;  // 用 位移  和  "或"  来拼接
     }
 
 //    public static void main(String [] args){

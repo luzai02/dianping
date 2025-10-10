@@ -7,6 +7,7 @@ import com.hmdp.mapper.VoucherMapper;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import static com.hmdp.constant.RedisConstant.SECKKILL_VOUCHER;
  * @since 2021-12-22
  */
 @Service
+@Slf4j
 public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> implements IVoucherService {
 
     @Resource
@@ -44,17 +46,24 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     @Override
     @Transactional
     public void addSeckillVoucher(Voucher voucher) {
-        // 保存优惠券
-        save(voucher);
-        // 保存秒杀信息
-        SeckillVoucher seckillVoucher = new SeckillVoucher();
-        seckillVoucher.setVoucherId(voucher.getId());
-        seckillVoucher.setStock(voucher.getStock());
-        seckillVoucher.setBeginTime(voucher.getBeginTime());
-        seckillVoucher.setEndTime(voucher.getEndTime());
-        seckillVoucherService.save(seckillVoucher);
-        // 把秒杀信息保存到Redis中
-        // todo 为什么只存储优惠券id  和  库存
-        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+        try {
+            // 保存优惠券
+            save(voucher);
+            // 保存秒杀信息
+            SeckillVoucher seckillVoucher = new SeckillVoucher();
+            seckillVoucher.setVoucherId(voucher.getId());
+            seckillVoucher.setStock(voucher.getStock());
+            seckillVoucher.setBeginTime(voucher.getBeginTime());
+            seckillVoucher.setEndTime(voucher.getEndTime());
+            seckillVoucherService.save(seckillVoucher);
+            // 把秒杀信息保存到Redis中
+            String finalKey = SECKILL_STOCK_KEY + voucher.getId();
+            log.info("准备写入 Redis，Key：{}，Value：{}", finalKey, voucher.getStock());
+            stringRedisTemplate.opsForValue().set(finalKey, voucher.getStock().toString());
+            log.info("Redis 写入完成");
+        } catch (Exception e) {
+            log.error("处理订单异常：{}",e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 }

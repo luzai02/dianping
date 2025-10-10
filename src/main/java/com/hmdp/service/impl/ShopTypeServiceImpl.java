@@ -40,7 +40,6 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         }
         // 从数据库中查询，按照升序，执行查询并返回列表list
         List<ShopType> list = query().orderByAsc("sort").list();
-        // todo:这里需要返回吗？
         if(list == null){
             return list;
         }

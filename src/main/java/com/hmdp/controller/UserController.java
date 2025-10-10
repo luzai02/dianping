@@ -105,4 +105,11 @@ public class UserController {
     public Result signCount(){
         return userService.signCount();
     }
+
+    // 分页查询
+    @GetMapping("/pagelist")
+    public Result list(@RequestParam("pageNum") Integer pageNum,
+                       @RequestParam("batchSize") Integer batchSize){
+        return Result.ok(userService.listByPage(pageNum, batchSize));
+    }
 }

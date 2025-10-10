@@ -2,6 +2,9 @@ package com.hmdp.mapper;
 
 import com.hmdp.entity.User;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * <p>
@@ -12,5 +15,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  * @since 2021-12-22
  */
 public interface UserMapper extends BaseMapper<User> {
-
+    @Select("select * from tb_user")
+    List<User> selectAll();
 }

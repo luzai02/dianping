@@ -45,7 +45,7 @@ public class CacheClient {
     public <T, ID> T queryWithNullPassThrough(ID id, String keyPrefix, Long expireTime, TimeUnit unit,
                                             Class<T> type,
                                             Function<ID, T> dbfallback){
-        String key = keyPrefix+id;
+        String key = keyPrefix+ id;
         // 从缓存中查找
         String Json = stringRedisTemplate.opsForValue().get(key); //   redis中存储的数据是json字符串
 
@@ -67,8 +67,6 @@ public class CacheClient {
         // 如果不存在，向redis中写入空值，解决缓存穿透问题
         if(t == null){
             // 存入空值，代表缓存中不存在该数据，防止缓存穿透
-            // todo 用布隆过滤器会更好  !!!  要优化
-            // todo 缓存雪崩
             stringRedisTemplate.opsForValue().set(key, "", RedisConstant.CACHE_NULL_TTL, TimeUnit.MINUTES);
             return null;
         }
@@ -114,38 +112,26 @@ public class CacheClient {
             return t;
         }
 
+        // 已过期
         String lockKey = RedisConstant.LOCK_SHOP_KEY+id;
-        // 利用互斥锁，开启新线程
-        try {
-            boolean isLock = trylock(lockKey);
-            // doubleCheck
-            Json = stringRedisTemplate.opsForValue().get(key);
-            if(StrUtil.isNotBlank(Json)){
-                redisData = JSONUtil.toBean(Json, RedisData.class);  // 先将Json转为RedisData对象
-                LocalDateTime latestExpireTime = redisData.getExpireTime();
-                if(latestExpireTime.isAfter(LocalDateTime.now())){
+        // 尝试获取锁
+        boolean isLock = trylock(lockKey);
+        if(isLock){
+            // 获取锁成功，启动新的线程重建缓存，当前线程直接返回旧数据
+            CACHE_REBUILD_EXECUTOR.submit(() -> {
+                try{
+                    T newT = dbfallback.apply(id);  // 获取新的数据
+                    this.setWithLoginExpired(key, newT, expireTime, unit);
+                }catch (Exception e){
+                    throw new RuntimeException(e);
+                }finally {
+                    // 最后一定要释放锁
                     unlock(lockKey);
-                    return JSONUtil.toBean((JSONObject) redisData.getData(), type);  // 再转为Shop对象
                 }
-            }
-            if(isLock){
-                // 获取锁成功，开启独立线程，实现缓存重建
-                CACHE_REBUILD_EXECUTOR.submit(() -> {
-                    try {
-                        // 去数据库查询数据，上面未未查询数据库，这里要添加逻辑
-                        // todo ：这里是新建对象还是对对象重新赋值？
-                        T newT = dbfallback.apply(id);   // todo：这是什么操作？？？
-                        this.setWithLoginExpired(key, newT, expireTime, unit);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }finally {
-            unlock(lockKey);
+            });
         }
+        // 不需要双重检验了
+
         return t;
     }
 

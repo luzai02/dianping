@@ -70,7 +70,14 @@ class HmDianPingApplicationTests {
             // todo:不做了
             // List<RedisGeoCommands.GeoLocation<String>> locations = new ArrayList<>(values.size());>
         }
-
-
     }
+
+    /**
+     * 预热店铺数据
+     */
+    @Test
+    public void testSaveShopToCache() throws InterruptedException {
+        shopService.saveShop2Redis(1L, 20);
+    }
+
 }

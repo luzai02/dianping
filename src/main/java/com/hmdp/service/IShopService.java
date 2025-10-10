@@ -3,6 +3,9 @@ package com.hmdp.service;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.hmdp.entity.ShopType;
+
+import java.util.List;
 
 /**
  * <p>
@@ -18,5 +21,6 @@ public interface IShopService extends IService<Shop> {
     Result updateShop(Shop shop);
 
     void saveShop2Redis(long id, long expiredSeconds) throws InterruptedException;
+
 
 }

@@ -5,7 +5,6 @@
 
 local voucherId = ARGV[1]
 local userId = ARGV[2]
-local orderId = ARGV[3]
 
 local stockKey = 'seckill:stock:' .. voucherId
 local orderKey = 'seckill:order:' .. voucherId
@@ -26,7 +25,5 @@ redis.call('DECR', stockKey)
 -- 添加用户到下单集合
 redis.call('SADD', orderKey, userId)
 
--- 发送消息
-redis.call('XADD', 'stream.orders', '*', 'userId', userId, 'voucherId', voucherId, 'id', orderId)
 
 return 0 -- 下单成功

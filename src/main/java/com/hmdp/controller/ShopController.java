@@ -5,11 +5,13 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
+import com.hmdp.entity.ShopType;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.SystemConstants;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 /**
  * <p>
@@ -35,6 +37,7 @@ public class ShopController {
     public Result queryShopById(@PathVariable("id") Long id) throws InterruptedException {
         return Result.ok(shopService.queryById(id));
     }
+
 
     /**
      * 新增商铺信息
@@ -72,6 +75,7 @@ public class ShopController {
             @RequestParam(value = "current", defaultValue = "1") Integer current
     ) {
         // 根据类型分页查询
+        // todo 这里的分页查询可以用pagehelper
         Page<Shop> page = shopService.query()
                 .eq("type_id", typeId)
                 .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
