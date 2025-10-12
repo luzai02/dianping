@@ -109,10 +109,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         // redis中的用户数据用Hash来保存，一减省空间，二方便crud     将user对象转为map
         // 而StringRedisTemplate中要求存储的数据都要是String类型，这里要做类型的转换
-        String token = UUID.randomUUID().toString(true);  // 使用hutool生成随机字符串token
+
+        // 使用hutool生成随机字符串token
+        String token = UUID.randomUUID().toString(true);
         Map<String,Object> userMap = BeanUtil.beanToMap(userDTO,  new HashMap<>(),
                 CopyOptions.create()
-                        .setIgnoreNullValue(true)   // 忽略null值
+                        // 忽略null值
+                        .setIgnoreNullValue(true)
                         // 将字段值转换为String类型
                         .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString())
         );

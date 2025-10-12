@@ -49,7 +49,6 @@ public class UserController {
      */
     @PostMapping("/login")
     public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
-        // TODO 这里前端会拦截不合法的token
         String token = userService.login(loginForm, session);
         return Result.ok(token);
     }

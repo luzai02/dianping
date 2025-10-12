@@ -148,7 +148,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                     .setSql("liked = liked - 1").eq("id", blogId).update();
             // 先确保数据库更新成功再更新redis
             if(flag){
-                stringRedisTemplate.opsForZSet().remove(key, userId.toString());
+                stringRedisTemplate.opsForZSet().remove(key, userId.toString(), System.currentTimeMillis());
             }
         } else {
             // 没有点过赞，点赞

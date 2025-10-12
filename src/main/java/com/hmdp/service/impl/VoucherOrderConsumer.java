@@ -11,7 +11,6 @@ import org.redisson.api.listener.MessageListener;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
@@ -25,8 +24,10 @@ public class VoucherOrderConsumer implements RocketMQListener<VoucherOrder> {
         log.info("收到消息：{}",voucherOrder.getVoucherId());
         try{
             voucherOrderService.handleVoucherOrder(voucherOrder);
+            log.info("处理订单完成：{}",voucherOrder.getId());
         } catch (Exception e) {
             log.error("处理订单异常：{}",e.getMessage());
+            // rocketmq 会自动重试
             throw new RuntimeException(e);
         }
     }

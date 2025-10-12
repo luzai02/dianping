@@ -1,14 +1,18 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.log.Log;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.hmdp.constant.MessageStatus;
 import com.hmdp.dto.Result;
+import com.hmdp.entity.OrderMessage;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.SeckillVoucherMapper;
 import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.service.IOrderMessageService;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -27,6 +31,7 @@ import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +70,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private RedissonClient redissonClient;
+    @Resource
+    private IOrderMessageService orderMessageService;
 
     // 改为使用rocketmq作为消息队列
     @Resource
@@ -113,9 +120,15 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             throw new RuntimeException(e);
         }
 
-        int r = result.intValue();  // 将Long类型转换为int类型
+        // 将Long类型转换为int类型
+        int r = result.intValue();
         if(r!=0){
             return Result.fail(r==2?"不能重复下单":"库存不足");
+        }
+
+        // 检查消息幂等性
+        if (orderMessageService.messageExists(userId, voucherId)) {
+            return Result.fail("订单已存在，请勿重复下单");
         }
 
         // 拥有下单资格，创建订单对象
@@ -124,28 +137,54 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setUserId(userId);
         voucherOrder.setVoucherId(voucherId);
 
+        // 生成事务ID
+        String transactionId = UUID.randomUUID().toString();
+
         // 通过rocketmq发送消息
+        // 这里不用加锁，因为这里只是发送用户下单请求，消费消息的时候才真正创建订单，并且做了幂等判断
         try{
-            rocketMQTemplate.convertAndSend(SECKILL_ORDER_TOPIC, voucherOrder);
-            log.info("发送消息成功:{}",voucherOrder);
+            // 创建消息记录
+
+            OrderMessage orderMessage = orderMessageService.creatOrderMessage(voucherOrder, transactionId);
+            // 发送事务消息
+            Message<VoucherOrder> message = MessageBuilder
+                    .withPayload(voucherOrder)
+                    .setHeader("businessKey", orderMessage.getBusinessKey())
+                    .setHeader("transactionId", transactionId)
+                    .build();
+
+            rocketMQTemplate.sendMessageInTransaction(
+                    "dianping-seckill-voucher-tx-producer", // 事务消息的生产者组
+                    SECKILL_ORDER_TOPIC,
+                    message,
+                    voucherId.toString()
+            );
+            log.info("消息发送成功，订单ID：{}, businessKey {}", orderId, orderMessage.getBusinessKey());
+
+            // todo 这里获取代理对象有什么用？
+            proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return Result.ok(orderId);
+
         }catch (Exception e){
             // 消息发送失败有很多原因：1.网络问题 2.服务器问题 3.业务问题
             log.error("消息发送失败", e);
-            // redis回滚
-            rollbackRedis(voucherId, userId);
+
+            // todo redis的数据最好还是不要回滚了，要么就标为为死信消息再回滚
+            // rollbackRedis(voucherId, userId);
+
+            // 更新消息状态为发送失败
+            String businessKey = voucherId + "_" + userId;
+            orderMessageService.updateMessageStatus(businessKey,  MessageStatus.FAILED.getCode(), e.getMessage());
+
             return Result.fail("下单失败，请重试");
         }
-        
-        // 获取锁代理对象，防止事务失效
-        proxy = (IVoucherOrderService) AopContext.currentProxy();
-
-        return Result.ok(orderId);
     }
 
     private void rollbackRedis(Long voucherId, Long userId){
         String lockKey = "lock:rollback:" + voucherId;
         RLock lock = redissonClient.getLock(lockKey);
         try {
+            // todo 这里为什么要加锁？  防止多线程同时回滚，导致库存超出范围
             boolean locked = lock.tryLock(0, 10, TimeUnit.SECONDS);
             if (!locked) {
                 log.error("回滚库存获取锁失败，voucher={}", voucherId);
@@ -182,6 +221,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // todo: lua脚本已经判断过一次了，这里不需要判断了吧。。。
         Long userId = voucherOrder.getUserId();  // 异步线程无法从ThreadLocal中获取userId，我们需要从voucherOrder中获取userId
         Long voucherId = voucherOrder.getVoucherId();
+
         // 幂等性判断
         int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
 
@@ -207,7 +247,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     // 实现用户下单
     public void handleVoucherOrder(VoucherOrder voucherOrder) throws InterruptedException {
-        Long userId = voucherOrder.getUserId();  // 异步线程无法从ThreadLocal中获取userId，我们需要从voucherOrder中获取userId
+        // 异步线程无法从ThreadLocal中获取userId，我们需要从voucherOrder中获取userId
+        Long userId = voucherOrder.getUserId();
         // 使用Redisson分布式锁，防止多进程访问同一用户下单
         RLock lock = redissonClient.getLock("lock:order:"+userId);
         boolean success = lock.tryLock(0,30, TimeUnit.SECONDS);
@@ -219,12 +260,21 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         try {
             // 获取锁成功，创建代理对象，调用第三方事务方法，防止事务失效
             // todo: 这里为什么不能使用代理？什么时候该使用代理？
+            // 直接调用创建订单方法，让它内部处理幂等性
+            proxy = (IVoucherOrderService) AopContext.currentProxy();
             proxy.createVoucherOrder(voucherOrder);
-            log.info("创建订单成功");
-        }catch (Exception e){
-            log.error("创建订单失败：{}",e.getMessage());
+            String businessKey = voucherOrder.getVoucherId() + "_" + voucherOrder.getUserId();
+            // 更新消息状态为成功
+            orderMessageService.updateMessageStatus(businessKey, MessageStatus.SUCCESS.getCode(), null);
+
+            log.info("处理订单消息成功, businessKey: {}, orderId: {}", businessKey, voucherOrder.getId());
+
+        } catch (Exception e) {
+            throw new RuntimeException("处理订单失败", e);
         } finally {
-            lock.unlock();
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 }

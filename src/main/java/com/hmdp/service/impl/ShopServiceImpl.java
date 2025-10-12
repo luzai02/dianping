@@ -72,15 +72,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     private static final String BLOOMFILTER_KEY = "shop:bloom:shop_id";
     private static final long EXPECTED_ELEMENTS = 100000;
+    // 误判率 1%
     private static final double FPP = 0.01;
 
     // 创建布隆过滤器对象
     private RBloomFilter<Long> bloomFilter;
 
     // 创建布隆过滤器
+    // todo 这里最好是离线生成，序列化后在线加载，否则启动会很慢
     @PostConstruct
     public void initBloomFilter() {
-        bloomFilter = redissonClient.getBloomFilter(BLOOMFILTER_KEY);  // 布隆过滤器名字
+        // 布隆过滤器名字
+        bloomFilter = redissonClient.getBloomFilter(BLOOMFILTER_KEY);
         bloomFilter.tryInit(EXPECTED_ELEMENTS, FPP);
         // 加载数据库中所有的 数据
         loadExitingShopIds();
@@ -91,8 +94,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         int pageSize = 1000;
         int pageNum = 1;
         while(true){
-            // 就是一个分页查询
-            int offset = (pageNum - 1) * pageSize;  // 获取当前页的起始索引
+            // 就是一个分页查询，获取当前页的起始索引
+            int offset = (pageNum - 1) * pageSize;
             List<Long> ids = shopMapper.selectAllShopIds(pageSize, offset);
             if(ids.isEmpty()){
                 break;
@@ -107,7 +110,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
 /*    // 从缓存中查找商铺
-    // todo: 这里的缓存有问题，没有将店铺数据缓存进去
     @Override
     public Result queryById(Long id) throws InterruptedException {
         // 缓存穿透
@@ -175,6 +177,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }*/
 
     public Result queryById(Long id) throws InterruptedException {
+        if(!bloomFilter.contains(id)){
+            return Result.fail("店铺不存在");
+        }
         // 使用Caffeine作为一级缓存
         Object o = caffeineCache.getIfPresent(RedisConstant.CACHE_SHOP_KEY+id);
         if(Objects.nonNull(o)){
@@ -223,8 +228,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 如果不存在，向redis中写入空值，解决缓存穿透问题
         if(shop == null){
             // 存入空值，代表缓存中不存在该数据，防止缓存穿透
-            // todo 用布隆过滤器会更好  !!!  要优化
-            // todo 缓存雪崩
             stringRedisTemplate.opsForValue().set(key, "", RedisConstant.CACHE_NULL_TTL, TimeUnit.MINUTES);
             return null;
         }
@@ -370,6 +373,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             });
         }
         // 不需要双重检验了
+        // 在“互斥锁 + 同步重建”方案中，请求线程会查库重建，代价大；
+        // 为避免已被其他线程重建还重复查库，需要“加锁后再读一次缓存”的双检。这里不存在该问题。
 
        return shop;
     }
