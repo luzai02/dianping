@@ -157,7 +157,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     "dianping-seckill-voucher-tx-producer", // 事务消息的生产者组
                     SECKILL_ORDER_TOPIC,
                     message,
-                    voucherId.toString()
+                    voucherOrder
             );
             log.info("消息发送成功，订单ID：{}, businessKey {}", orderId, orderMessage.getBusinessKey());
 

@@ -176,15 +176,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shop);
     }*/
 
-    public Result queryById(Long id) throws InterruptedException {
+    public Shop queryById(Long id) throws InterruptedException {
         if(!bloomFilter.contains(id)){
-            return Result.fail("店铺不存在");
+            log.info("布隆过滤器拦截，id不存在: {}", id);
+            return null;
         }
         // 使用Caffeine作为一级缓存
         Object o = caffeineCache.getIfPresent(RedisConstant.CACHE_SHOP_KEY+id);
         if(Objects.nonNull(o)){
             log.info("一级缓存命中");
-            return Result.ok(o);
+            return null;
         }
         // Shop shop = queryWithMutex(id);
         Shop shop = cacheClient.queryWithNullPassThrough(id,
@@ -199,9 +200,10 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             // 将当前缓存放入一级缓存
             caffeineCache.put(RedisConstant.CACHE_SHOP_KEY+id, shop);
         }else{
-            return Result.fail("店铺不存在");
+            log.info("缓存未命中，店铺不存在");
+            return null;
         }
-        return Result.ok(shop);
+        return shop;
     }
 
 

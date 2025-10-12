@@ -16,7 +16,7 @@ import java.util.List;
  * @since 2021-12-22
  */
 public interface IShopService extends IService<Shop> {
-    Result queryById(Long id) throws InterruptedException;
+    Shop queryById(Long id) throws InterruptedException;
 
     Result updateShop(Shop shop);
 

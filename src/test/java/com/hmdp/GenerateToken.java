@@ -52,7 +52,7 @@ public class GenerateToken {
     @Resource
     private ObjectMapper mapper;
 
-    private static final int BATCH_SIZE = 1000;
+    private static final int BATCH_SIZE = 10000;
     private static final int THREAD_POOL_SIZE = 200; // 增加线程池大小以提高效率
 
     @Test

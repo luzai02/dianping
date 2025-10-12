@@ -1,5 +1,6 @@
 package com.hmdp;
 
+import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.RedisIdWorker;
@@ -78,6 +79,57 @@ class HmDianPingApplicationTests {
     @Test
     public void testSaveShopToCache() throws InterruptedException {
         shopService.saveShop2Redis(1L, 20);
+    }
+
+    @Test
+    public void testCachePerformance() throws InterruptedException {
+        int totalRequests = 10000;
+        int hitCount = 0;
+        long startTime = System.currentTimeMillis();
+
+        for (int i = 0; i < totalRequests; i++) {
+            // 模拟随机店铺ID查询
+            Long shopId = (long) (Math.random() * 100 + 1);
+            Shop shop = shopService.queryById(shopId);
+
+            if (shop != null) {
+                hitCount++;
+            }
+        }
+
+        long endTime = System.currentTimeMillis();
+        double hitRate = (double) hitCount / totalRequests * 100;
+        double avgResponseTime = (double) (endTime - startTime) / totalRequests;
+
+        System.out.println("缓存命中率: " + hitRate + "%");
+        System.out.println("平均响应时间: " + avgResponseTime + "ms");
+    }
+
+    @Test
+    public void testDataConsistency() throws InterruptedException {
+        // 1. 更新数据库中的店铺信息
+        Shop shop = shopService.getById(1L);
+        shop.setName("测试店铺_" + System.currentTimeMillis());
+
+        long updateTime = System.currentTimeMillis();
+        shopService.updateById(shop);
+
+        // 2. 轮询检查缓存是否更新
+        while (true) {
+            Shop cachedShop = shopService.queryById(1L);
+            if (cachedShop.getName().equals(shop.getName())) {
+                long syncTime = System.currentTimeMillis();
+                long delay = syncTime - updateTime;
+                System.out.println("数据同步延迟: " + delay + "ms");
+                break;
+            }
+
+            try {
+                Thread.sleep(10); // 每10ms检查一次
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
     }
 
 }

@@ -35,7 +35,7 @@ public class OrderTransactionalListener implements RocketMQLocalTransactionListe
 
             log.info("执行本地事务，业务key：{}",businessKey);
             // 执行幂等性检查
-            if(!orderMessageService.messageExists(voucherOrder.getUserId(),voucherOrder.getVoucherId())){
+            if(orderMessageService.messageExists(voucherOrder.getUserId(),voucherOrder.getVoucherId())){
                 log.warn("订单已存在，事务回滚，业务key：{}",businessKey);
                 orderMessageService.updateMessageStatus(businessKey, MessageStatus.ROLLBACK.getCode(), "订单已存在");
                 return RocketMQLocalTransactionState.ROLLBACK;

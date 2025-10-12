@@ -29,10 +29,10 @@ spring:
     database: 0
     lettuce:
       pool:
-        max-active: 10
-        max-idle: 10
-        min-idle: 1
-        time-between-eviction-runs: 10s
+        max-active: 200  # 增加连接池大小
+        max-wait: -1ms
+        max-idle: 20
+        min-idle: 5
 
 
 mybatis-plus:
@@ -45,8 +45,11 @@ rocketmq:
   producer:
     group: seckill-order-tx-group
     send-message-timeout: 3000
-    retry-times-when-send-async-failed: 3
+    retry-times-when-send-async-failed: 2
     retry-times-when-send-failed: 3
+  consumer:
+    consume-thread-min: 20
+    consume-thread-max: 64
 
 canal:
   destination: test # canal的集群名字，要与安装canal时设置的名称一致
