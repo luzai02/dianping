@@ -190,13 +190,12 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         // Shop shop = queryWithMutex(id);
-        Shop shop = cacheClient.queryWithLoginExpired(
+        Shop shop = cacheClient.queryWithNullPassThrough(id,
                 RedisConstant.CACHE_SHOP_KEY,
-                id,
                 RedisConstant.CACHE_SHOP_TTL,
                 TimeUnit.MINUTES,
-                this::getById, // 可以写成 this::getById
-                Shop.class
+                Shop.class,
+                this::getById// 可以写成 this::getById
         );
         if(shop != null){
             log.info("二级缓存命中");

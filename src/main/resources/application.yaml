@@ -14,7 +14,7 @@ spring:
   cloud:
     sentinel:
       transport:
-        dashboard: localhost:8088
+        dashboard: localhost:8090
   task:
     scheduling:
       pool:

@@ -33,6 +33,7 @@ public class ShopHandle implements EntryHandler<Shop>{
         try {
             String key = RedisConstant.CACHE_SHOP_KEY + shop.getId();
             shopRedisHandle.saveShop(shop);
+            // todo 这里为什么还要存到caffeine中？上面那个方法不是因为存了吗？
             cache.put(key, shop);
             log.info("Canal监听到插入操作，更新缓存成功：{}", key);
         } catch (Exception e) {
@@ -40,13 +41,19 @@ public class ShopHandle implements EntryHandler<Shop>{
         }
     }
 
-        @Override
+    @Override
     public void update(Shop before, Shop after) {
-            try {
-                String key = RedisConstant.CACHE_SHOP_KEY + after.getId();
-                shopRedisHandle.saveShop(after);
-                cache.put(key, after);
-                log.info("Canal监听到更新操作，更新缓存成功：{}", key);
+        long canalReceiveTime = System.currentTimeMillis();
+        try {
+            String key = RedisConstant.CACHE_SHOP_KEY + after.getId();
+            shopRedisHandle.saveShop(after);
+            cache.put(key, after);
+
+            long processTime = System.currentTimeMillis() - canalReceiveTime;
+            log.info("Canal处理延迟: {}ms, key: {}", processTime, key);
+
+            // 可以发送到监控系统
+            // monitorService.recordLatency("canal.process", processTime);
             } catch (Exception e) {
                 log.error("Canal处理更新操作失败", e);
             }
