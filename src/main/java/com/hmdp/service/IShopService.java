@@ -18,7 +18,7 @@ import java.util.List;
 public interface IShopService extends IService<Shop> {
     Shop queryById(Long id) throws InterruptedException;
 
-    Result updateShop(Shop shop);
+    boolean updateShop(Shop shop);
 
     void saveShop2Redis(long id, long expiredSeconds) throws InterruptedException;
 

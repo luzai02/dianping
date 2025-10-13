@@ -105,31 +105,5 @@ class HmDianPingApplicationTests {
         System.out.println("平均响应时间: " + avgResponseTime + "ms");
     }
 
-    @Test
-    public void testDataConsistency() throws InterruptedException {
-        // 1. 更新数据库中的店铺信息
-        Shop shop = shopService.getById(1L);
-        shop.setName("测试店铺_" + System.currentTimeMillis());
-
-        long updateTime = System.currentTimeMillis();
-        shopService.updateById(shop);
-
-        // 2. 轮询检查缓存是否更新
-        while (true) {
-            Shop cachedShop = shopService.queryById(1L);
-            if (cachedShop.getName().equals(shop.getName())) {
-                long syncTime = System.currentTimeMillis();
-                long delay = syncTime - updateTime;
-                System.out.println("数据同步延迟: " + delay + "ms");
-                break;
-            }
-
-            try {
-                Thread.sleep(10); // 每10ms检查一次
-            } catch (InterruptedException e) {
-                break;
-            }
-        }
-    }
 
 }

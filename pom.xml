@@ -206,10 +206,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                    <compilerArgs>--enable-preview</compilerArgs>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <!-- 移除 -enable-preview -->
                 </configuration>
             </plugin>
         </plugins>

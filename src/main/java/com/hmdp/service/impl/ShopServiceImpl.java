@@ -181,19 +181,22 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             log.info("布隆过滤器拦截，id不存在: {}", id);
             return null;
         }
+
         // 使用Caffeine作为一级缓存
         Object o = caffeineCache.getIfPresent(RedisConstant.CACHE_SHOP_KEY+id);
         if(Objects.nonNull(o)){
             log.info("一级缓存命中");
-            return null;
+            return (Shop) o;
         }
+
         // Shop shop = queryWithMutex(id);
-        Shop shop = cacheClient.queryWithNullPassThrough(id,
+        Shop shop = cacheClient.queryWithLoginExpired(
                 RedisConstant.CACHE_SHOP_KEY,
+                id,
                 RedisConstant.CACHE_SHOP_TTL,
                 TimeUnit.MINUTES,
-                Shop.class,
-                this::getById // 可以写成 this::getById
+                this::getById, // 可以写成 this::getById
+                Shop.class
         );
         if(shop != null){
             log.info("二级缓存命中");
@@ -383,17 +386,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     // 先更新数据库再删除redis缓存
     @Override
-    public Result updateShop(Shop shop) {
+    public boolean updateShop(Shop shop) {
         Long id = shop.getId();
         if(id == null){
-            return Result.fail("店铺id不能为空");
+            log.info("店铺id不能为空");
+            return false;
         }
         // 根据id来更新数据库
         updateById(shop);
         // 已经通过canal监听实现
 //        // 删除缓存
 //        stringRedisTemplate.delete(RedisConstant.CACHE_SHOP_KEY+id);
-        return Result.ok();
+        return true;
     }
 
     private boolean trylock(String key){
